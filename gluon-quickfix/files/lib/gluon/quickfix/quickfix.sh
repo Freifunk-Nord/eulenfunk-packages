@@ -1,4 +1,5 @@
 #!/bin/sh
+MESH='IBSS0'
 
 #################
 # safety checks #
@@ -27,8 +28,8 @@ scan() {
 }
 
 OLD_NEIGHBOURS=$(cat /tmp/neighbours_mesh0 2>/dev/null)
-NEIGHBOURS=$(iw dev mesh0 station dump | grep -e "^Station " | awk '{ print $2 }')
-echo $NEIGHBOURS > /tmp/neighbours_mesh0
+NEIGHBOURS=$(iw dev $MESH station dump | grep -e "^Station " | awk '{ print $2 }')
+echo $NEIGHBOURS > /tmp/neighbours_$MESH
 
 # check if we have lost any neighbours
 for NEIGHBOUR in $OLD_NEIGHBOURS

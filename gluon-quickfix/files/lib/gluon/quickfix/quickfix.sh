@@ -1,5 +1,4 @@
 #!/bin/sh
-MESH='IBSS0'
 
 #################
 # safety checks #
@@ -27,9 +26,10 @@ scan() {
 	iw dev mesh0 scan >/dev/null
 }
 
-OLD_NEIGHBOURS=$(cat /tmp/neighbours_mesh0 2>/dev/null)
-NEIGHBOURS=$(iw dev $MESH station dump | grep -e "^Station " | awk '{ print $2 }')
-echo $NEIGHBOURS > /tmp/neighbours_$MESH
+DEV="$(iw dev|grep Interface|grep -e 'mesh0' -e 'ibss0'| awk '{ print $2 }')"
+OLD_NEIGHBOURS=$(cat /tmp/mesh_neighbours 2>/dev/null)
+NEIGHBOURS=$(iw dev $DEV station dump | grep -e "^Station " | awk '{ print $2 }')
+echo $NEIGHBOURS > /tmp/mesh_neighbours
 
 # check if we have lost any neighbours
 for NEIGHBOUR in $OLD_NEIGHBOURS
@@ -54,4 +54,3 @@ pgrep dropbear >/dev/null || reboot "dropbear not running"
 # reboot if there was a kernel (batman) error
 # for an example gluon issue #680
 dmesg | grep "Kernel bug" >/dev/null && reboot "gluon issue #680"
-

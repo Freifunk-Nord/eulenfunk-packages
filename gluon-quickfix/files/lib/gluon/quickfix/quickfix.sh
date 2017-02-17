@@ -48,8 +48,7 @@ reboot() {
 	/sbin/reboot # comment out for debugging purposes
 }
 
-# if respondd or dropbear not running, reboot (probably ram was full, so more services might've crashed)
-pgrep respondd >/dev/null || reboot "respondd not running"
+# if dropbear not running, reboot (probably ram was full, so more services might've crashed)
 pgrep dropbear >/dev/null || reboot "dropbear not running"
 
 # reboot if there was a kernel (batman) error

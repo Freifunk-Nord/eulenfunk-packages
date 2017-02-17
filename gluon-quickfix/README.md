@@ -9,5 +9,5 @@ To be sure, that the script is not disturbing the start and update process:
 
 ### Workarounds
 - check if we have lost any neighbours, `iw dev $DEV scan`
-- if respondd or dropbear not running, reboot (probably ram was full, so more services might've crashed)
+- if dropbear is not running, reboot (probably ram was full, so more services might've crashed)
 - reboot if there was a kernel (batman) error

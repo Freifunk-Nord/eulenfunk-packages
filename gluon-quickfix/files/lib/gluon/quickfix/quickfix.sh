@@ -42,15 +42,15 @@ done
 # reboots #
 ###########
 
-reboot() {
-	logger -s -t "gluon-quickfix" -p 5 "rebooting... reason: $@"
-	# push log to server here (nyi)
-	/sbin/reboot # comment out for debugging purposes
+_reboot() {
+	logger -s -t "gluon-quickfix" -p 5 "_reboot called... reason: $@"
+	# never reboot before 60 minutes
+	[ $(cat /proc/uptime | sed 's/\..*//g') -gt 3600 ] || /sbin/reboot
 }
 
 # if dropbear not running, reboot (probably ram was full, so more services might've crashed)
-pgrep dropbear >/dev/null || reboot "dropbear not running"
+pgrep dropbear >/dev/null || _reboot "dropbear not running"
 
 # reboot if there was a kernel (batman) error
 # for an example gluon issue #680
-dmesg | grep "Kernel bug" >/dev/null && reboot "gluon issue #680"
+dmesg | grep "Kernel bug" >/dev/null && _reboot "gluon issue #680"

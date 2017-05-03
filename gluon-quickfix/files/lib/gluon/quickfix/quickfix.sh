@@ -14,8 +14,8 @@ safety_exit() {
 # if autoupdater is running, exit
 pgrep -f autoupdater >/dev/null && safety_exit
 
-# if the router started less than 5 minutes ago, exit
-[ $(cat /proc/uptime | sed 's/\..*//g') -gt 300 ] || safety_exit
+# if the router started less than 10 minutes ago, exit
+[ $(cat /proc/uptime | sed 's/\..*//g') -gt 600 ] || safety_exit
 
 echo safety checks done, continuing...
 

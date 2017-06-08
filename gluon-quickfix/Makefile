@@ -25,8 +25,8 @@ define Build/Compile
 endef
 
 define Package/gluon-quickfix/install
-        $(CP) ./files/* $(1)/
+  $(CP) ./files/* $(1)/
+  ./gluonShellDiet.sh $(1)/lib/gluon/ssid-changer/ssid-changer.sh
 endef
 
 $(eval $(call BuildPackage,gluon-quickfix))
-

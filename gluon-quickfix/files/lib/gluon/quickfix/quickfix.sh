@@ -48,7 +48,8 @@ _reboot() {
 	[ $(cat /proc/uptime | sed 's/\..*//g') -gt 3600 ] || /sbin/reboot
 }
 
-# if dropbear not running, reboot (probably ram was full, so more services might've crashed)
+# if respondd or dropbear not running, reboot (probably ram was full, so more services might've crashed)
+pgrep respondd >/dev/null || _reboot "respondd not running"
 pgrep dropbear >/dev/null || _reboot "dropbear not running"
 
 # reboot if there was a kernel (batman) error

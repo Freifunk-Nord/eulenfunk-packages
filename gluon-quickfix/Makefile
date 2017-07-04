@@ -15,7 +15,7 @@ define Package/gluon-quickfix
 endef
 
 define Build/Prepare
-        mkdir -p $(PKG_BUILD_DIR)
+	mkdir -p $(PKG_BUILD_DIR)
 endef
 
 define Build/Configure
@@ -25,8 +25,7 @@ define Build/Compile
 endef
 
 define Package/gluon-quickfix/install
-        $(CP) ./files/* $(1)/
+	$(CP) ./files/* $(1)/
 endef
 
 $(eval $(call BuildPackage,gluon-quickfix))
-

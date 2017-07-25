@@ -45,7 +45,7 @@ done
 _reboot() {
 	logger -s -t "gluon-quickfix" -p 5 "_reboot called... reason: $@"
 	# never reboot before 60 minutes
-	[ $(cat /proc/uptime | sed 's/\..*//g') -gt 3600 ] || /sbin/reboot
+	[ $(cat /proc/uptime | sed 's/\..*//g') -lt 3600 ] || /sbin/reboot
 }
 
 # if respondd or dropbear not running, reboot (probably ram was full, so more services might've crashed)

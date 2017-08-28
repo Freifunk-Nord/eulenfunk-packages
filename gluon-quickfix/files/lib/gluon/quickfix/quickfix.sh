@@ -10,12 +10,17 @@ safety_exit() {
 }
 
 now_reboot() {
-  MSG="rebooting... reason: $@"
+  # first parameter message
+  # second optional -f to force reboot even if autoupdater is running
+  MSG="rebooting... reason: $1"
   logger -s -t "gluon-quickfix" -p 5 $MSG
   if [ "$(sed 's/\..*//g' /proc/uptime)" -gt "3600" ] ; then
     LOG=/lib/gluon/quickfix/reboot.log
     # the first 5 times log the reason for a reboot in a file that is rebootsave
-    [ "$(wc -l < $LOG)" -gt 5 ] || echo "$(date) $@" >> $LOG
+    [ "$(wc -l < $LOG)" -gt 5 ] || echo "$(date) $1" >> $LOG
+    if [ "$2" != "-f" ] && [ -f /tmp/autoupdate.lock ] ; then
+      safety_exit "autoupdate running"
+    fi
     /sbin/reboot -f
   fi
   logger -s -t "gluon-quickfix" -p 5 "no reboot during first hour"
@@ -24,17 +29,15 @@ now_reboot() {
 # don't do anything the first 10 minutes
 [ "$(sed 's/\..*//g' /proc/uptime)" -gt "600" ] || safety_exit "uptime low!"
 
-# stale autoupdater
+# check for stale autoupdater
 if [ -f /tmp/autoupdate.lock ] ; then
   MAXAGE=$(($(date +%s)-60*${UPDATEWAIT}))
   LOCKAGE=$(date -r /tmp/autoupdate.lock +%s)
   if [ "$MAXAGE" -gt "$LOCKAGE" ] ; then
-    now_reboot "stale autoupdate.lock file"
+    now_reboot "stale autoupdate.lock file" -f
   fi
   safety_exit "autoupdate running"
- fi
-
-echo safety checks done, continuing...
+fi
 
 # batman-adv crash when removing interface in certain configurations
 dmesg | grep -q "Kernel bug" && now_reboot "gluon issue #680"
@@ -59,7 +62,6 @@ pgrep dropbear >/dev/null || sleep 20; pgrep dropbear >/dev/null || now_reboot "
 if [ "$(uci get wireless.radio0)" == "wifi-device" ]; then
   if [ ! "$(uci show|grep wireless.radio0.disabled|cut -d= -f2|tr -d \')" == "1" ]; then
     if ! [[  "$(uci show|grep wireless.mesh_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  &&  "$(uci show|grep wireless.client_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  ]]; then
-      echo has radio0 enabled
       iw dev > /tmp/iwdev.log &
       p_iw=$!
       sleep 20

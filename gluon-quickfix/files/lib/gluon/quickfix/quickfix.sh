@@ -70,22 +70,21 @@ iw_dev_reboot_freeze() {
   kill -0 $p 2>/dev/null && now_reboot "iw dev freezes for more than $t s during 'iw dev $@'"
 }
 
+scan() {
+  logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
+  iw_dev_reboot_freeze 30 $1 scan lowpri passive>/dev/null
+}
+
 # check all radios for lost neighbours
 for mesh_radio in `uci show wireless | grep -E -o '(ibss|mesh)_radio[0-9]+' | awk '!seen[$0]++'`; do
   radio="$(uci get wireless.$mesh_radio.device)"
   if [[ "$(uci -q get wireless.$radio.disabled)" != "1" && "$(uci -q get wireless.$mesh_radio.disabled)" != "1" ]]; then
-
     DEV="$(uci get wireless.$mesh_radio.ifname)"
-    scan() {
-      logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
-      iw_dev_reboot_freeze 30 $DEV scan lowpri passive>/dev/null
-    }
-
     OLD_NEIGHBOURS=$(cat "/tmp/mesh_neighbours_$mesh_radio" 2>/dev/null)
     NEIGHBOURS=$(iw_dev_reboot_freeze 20 $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
     echo $NEIGHBOURS > "/tmp/mesh_neighbours_$mesh_radio"
     for NEIGHBOUR in $OLD_NEIGHBOURS; do
-       echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan; break)
+       echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan $DEV; break)
     done
   fi
 done

@@ -54,9 +54,13 @@ if [ "$brc6" == "0" ]; then
   now_reboot "br-client without ipv6 in prefix-range (probably none)"
 fi
 
+reboot_when_not_running() {
+  pgrep $1 || sleep 20 ; pgrep $1 || now_reboot "$1 not running"
+}
+
 # respondd or dropbear not running
-pgrep respondd >/dev/null || sleep 20; pgrep respondd >/dev/null || now_reboot "respondd not running"
-pgrep dropbear >/dev/null || sleep 20; pgrep dropbear >/dev/null || now_reboot "dropbear not running"
+reboot_when_not_running respondd
+reboot_when_not_running dropbear
 
 # radio0_check for lost neighbours
 if [ "$(uci get wireless.radio0)" == "wifi-device" ]; then

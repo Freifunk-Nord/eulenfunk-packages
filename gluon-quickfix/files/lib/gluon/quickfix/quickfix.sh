@@ -55,7 +55,7 @@ if [ "$brc6" == "0" ]; then
 fi
 
 reboot_when_not_running() {
-  pgrep $1 || sleep 20 ; pgrep $1 || now_reboot "$1 not running"
+  (pgrep $1 || sleep 20 ; pgrep $1 || now_reboot "$1 not running") &> /dev/null
 }
 
 # respondd or dropbear not running
@@ -84,7 +84,7 @@ for mesh_radio in `uci show wireless | grep -E -o '(ibss|mesh)_radio[0-9]+' | aw
     NEIGHBOURS=$(iw_dev_reboot_freeze 20 $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
     echo $NEIGHBOURS > "/tmp/mesh_neighbours_$mesh_radio"
     for NEIGHBOUR in $OLD_NEIGHBOURS; do
-       echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan $DEV; break)
+       grep -q $NEIGHBOUR "/tmp/mesh_neighbours_$mesh_radio" || (scan $DEV; break)
     done
   fi
 done

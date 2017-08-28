@@ -52,26 +52,25 @@ fi
 pgrep respondd >/dev/null || sleep 20; pgrep respondd >/dev/null || now_reboot "respondd not running"
 pgrep dropbear >/dev/null || sleep 20; pgrep dropbear >/dev/null || now_reboot "dropbear not running"
 
-# radio0_check for lost neighbours
-if [ "$(uci get wireless.radio0)" == "wifi-device" ]; then
-  if [ ! "$(uci show|grep wireless.radio0.disabled|cut -d= -f2|tr -d \')" == "1" ]; then
-    if ! [[  "$(uci show|grep wireless.mesh_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  &&  "$(uci show|grep wireless.client_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  ]]; then
-      echo has radio0 enabled
-      [ -f /tmp/iwdev.log ] && rm /tmp/iwdev.log
-      iw dev > /tmp/iwdev.log &
-      sleep 20
-      jobs && now_reboot "iw dev freezes or radio0 misconfigured"
-      DEV="$(grep -h Interface /tmp/iwdev.log |grep -e 'mesh0' -e 'ibss0' | cut -f 2 -d ' '|head -1)"
-      scan() {
-        logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
-        iw dev $DEV scan lowpri passive>/dev/null
-      }
-      OLD_NEIGHBOURS=$(cat /tmp/mesh_neighbours 2>/dev/null)
-      NEIGHBOURS=$(iw dev $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
-      echo $NEIGHBOURS > /tmp/mesh_neighbours
-      for NEIGHBOUR in $OLD_NEIGHBOURS; do
-        echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan; break)
-      done
-    fi
+for mesh_radio in `uci show wireless | grep -E -o '(ibss|mesh)_radio[0-9]+' | awk '!seen[$0]++'`; do
+  radio="$(uci get wireless.$mesh_radio.device)"
+  if [[ "$(uci -q get wireless.$radio.disabled)" != "1" && "$(uci -q get wireless.$mesh_radio.disabled)" != "1" ]]; then
+    [ -f /tmp/iwdev.log ] && rm /tmp/iwdev.log
+    iw dev > /tmp/iwdev.log &
+    sleep 20
+    jobs && now_reboot "iw dev freezes or $radio misconfigured"
+
+    DEV="$(uci get wireless.$mesh_radio.ifname)"
+    scan() {
+      logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
+      iw dev $DEV scan lowpri passive>/dev/null
+    }
+
+    OLD_NEIGHBOURS=$(cat "/tmp/mesh_neighbours_$mesh_radio" 2>/dev/null)
+    NEIGHBOURS=$(iw dev $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
+    echo $NEIGHBOURS > "/tmp/mesh_neighbours_$mesh_radio"
+    for NEIGHBOUR in $OLD_NEIGHBOURS; do
+       echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan; break)
+    done
   fi
-fi
+done

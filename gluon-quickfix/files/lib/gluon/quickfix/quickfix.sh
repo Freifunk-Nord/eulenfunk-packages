@@ -10,9 +10,17 @@ safety_exit() {
 }
 
 now_reboot() {
-  logger -s -t "gluon-quickfix" -p 5 "rebooting... reason: $@"
+  # first parameter message
+  # second optional -f to force reboot even if autoupdater is running
+  MSG="rebooting... reason: $1"
+  logger -s -t "gluon-quickfix" -p 5 $MSG
   if [ "$(sed 's/\..*//g' /proc/uptime)" -gt "3600" ] ; then
-    echo rebooting
+    LOG=/lib/gluon/quickfix/reboot.log
+    # the first 5 times log the reason for a reboot in a file that is rebootsave
+    [ "$(wc -l < $LOG)" -gt 5 ] || echo "$(date) $1" >> $LOG
+    if [ "$2" != "-f" ] && [ -f /tmp/autoupdate.lock ] ; then
+      safety_exit "autoupdate running"
+    fi
     /sbin/reboot -f
   fi
   logger -s -t "gluon-quickfix" -p 5 "no reboot during first hour"
@@ -21,17 +29,15 @@ now_reboot() {
 # don't do anything the first 10 minutes
 [ "$(sed 's/\..*//g' /proc/uptime)" -gt "600" ] || safety_exit "uptime low!"
 
-# stale autoupdater
+# check for stale autoupdater
 if [ -f /tmp/autoupdate.lock ] ; then
   MAXAGE=$(($(date +%s)-60*${UPDATEWAIT}))
   LOCKAGE=$(date -r /tmp/autoupdate.lock +%s)
   if [ "$MAXAGE" -gt "$LOCKAGE" ] ; then
-    now_reboot "stale autoupdate.lock file"
+    now_reboot "stale autoupdate.lock file" -f
   fi
   safety_exit "autoupdate running"
- fi
-
-echo safety checks done, continuing...
+fi
 
 # batman-adv crash when removing interface in certain configurations
 dmesg | grep -q "Kernel bug" && now_reboot "gluon issue #680"
@@ -48,17 +54,22 @@ if [ "$brc6" == "0" ]; then
   now_reboot "br-client without ipv6 in prefix-range (probably none)"
 fi
 
-# respondd or dropbear not running
-pgrep respondd >/dev/null || sleep 20; pgrep respondd >/dev/null || now_reboot "respondd not running"
-pgrep dropbear >/dev/null || sleep 20; pgrep dropbear >/dev/null || now_reboot "dropbear not running"
+reboot_when_not_running() {
+  pgrep $1 || sleep 20 ; pgrep $1 || now_reboot "$1 not running"
+}
 
+# respondd or dropbear not running
+reboot_when_not_running respondd
+reboot_when_not_running dropbear
+
+# check all radios for lost neighbours
 for mesh_radio in `uci show wireless | grep -E -o '(ibss|mesh)_radio[0-9]+' | awk '!seen[$0]++'`; do
   radio="$(uci get wireless.$mesh_radio.device)"
   if [[ "$(uci -q get wireless.$radio.disabled)" != "1" && "$(uci -q get wireless.$mesh_radio.disabled)" != "1" ]]; then
-    [ -f /tmp/iwdev.log ] && rm /tmp/iwdev.log
     iw dev > /tmp/iwdev.log &
+    p_iw=$!
     sleep 20
-    jobs && now_reboot "iw dev freezes or $radio misconfigured"
+    kill -0 $p_iw 2>/dev/null && now_reboot "iw dev freezes or $radio misconfigured"
 
     DEV="$(uci get wireless.$mesh_radio.ifname)"
     scan() {

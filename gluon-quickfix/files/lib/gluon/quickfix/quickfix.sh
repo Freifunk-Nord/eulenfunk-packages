@@ -10,9 +10,12 @@ safety_exit() {
 }
 
 now_reboot() {
-  logger -s -t "gluon-quickfix" -p 5 "rebooting... reason: $@"
+  MSG="rebooting... reason: $@"
+  logger -s -t "gluon-quickfix" -p 5 $MSG
   if [ "$(sed 's/\..*//g' /proc/uptime)" -gt "3600" ] ; then
-    echo rebooting
+    LOG=/lib/gluon/quickfix/reboot.log
+    # the first 5 times log the reason for a reboot in a file that is rebootsave
+    [ "$(wc -l < $LOG)" -gt 5 ] || echo "$(date) $@" >> $LOG
     /sbin/reboot -f
   fi
   logger -s -t "gluon-quickfix" -p 5 "no reboot during first hour"

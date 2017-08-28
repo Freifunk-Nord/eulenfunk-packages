@@ -11,7 +11,7 @@ safety_exit() {
 
 now_reboot() {
   logger -s -t "gluon-quickfix" -p 5 "rebooting... reason: $@"
-  if [ "$(cat /proc/uptime | sed 's/\..*//g')" -gt "3600" ] ; then
+  if [ "$(sed 's/\..*//g' /proc/uptime)" -gt "3600" ] ; then
     echo rebooting
     /sbin/reboot -f
   fi
@@ -19,7 +19,7 @@ now_reboot() {
 }
 
 # don't do anything the first 10 minutes
-[ "$(cat /proc/uptime | sed 's/\..*//g')" -gt "600" ] || safety_exit "uptime low!"
+[ "$(sed 's/\..*//g' /proc/uptime)" -gt "600" ] || safety_exit "uptime low!"
 
 # stale autoupdater
 if [ -f /tmp/autoupdate.lock ] ; then
@@ -34,16 +34,16 @@ if [ -f /tmp/autoupdate.lock ] ; then
 echo safety checks done, continuing...
 
 # batman-adv crash when removing interface in certain configurations
-dmesg | grep "Kernel bug" >/dev/null && now_reboot "gluon issue #680"
+dmesg | grep -q "Kernel bug" && now_reboot "gluon issue #680"
 # ath/ksoftirq-malloc-errors (upcoming oom scenario)
-dmesg | grep ath | grep "alloc of size" | grep "failed" && now_reboot "ath0 malloc fail"
-dmesg | grep "ksoftirqd" | grep "page allcocation failure" && now_reboot "kernel malloc fail"
+dmesg | grep "ath" | grep "alloc of size" | grep -q "failed" && now_reboot "ath0 malloc fail"
+dmesg | grep "ksoftirqd" | grep -q "page allcocation failure" && now_reboot "kernel malloc fail"
 
 # too many tunneldigger restarts
-[ "$(ps |grep -e tunneldigger\ restart -e tunneldigger-watchdog|wc -l)" -ge "9" ] && now_reboot "too many Tunneldigger-Restarts"
+[ "$(ps |grep -c -e tunneldigger\ restart -e tunneldigger-watchdog)" -ge "9" ] && now_reboot "too many Tunneldigger-Restarts"
 
 # br-client without ipv6 in prefix-range
-brc6=$(ip -6 a s dev br-client | awk '/inet6/ { print $2 }'|cut -b1-9 |grep -c $(cat /lib/gluon/site.json|tr "," "\n"|grep \"prefix6\"|cut -d: -f2-3|cut -b2-10) 2>/dev/nul)
+brc6=$(ip -6 a s dev br-client | awk '/inet6/ { print $2 }'|cut -b1-9 |grep -c $(cat /lib/gluon/site.json|tr "," "\n"|grep \"prefix6\"|cut -d: -f2-3|cut -b2-10) 2>/dev/null)
 if [ "$brc6" == "0" ]; then
   now_reboot "br-client without ipv6 in prefix-range (probably none)"
 fi
@@ -57,20 +57,20 @@ if [ "$(uci get wireless.radio0)" == "wifi-device" ]; then
   if [ ! "$(uci show|grep wireless.radio0.disabled|cut -d= -f2|tr -d \')" == "1" ]; then
     if ! [[  "$(uci show|grep wireless.mesh_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  &&  "$(uci show|grep wireless.client_radio0.disabled|cut -d= -f2|tr -d \')" == "1"  ]]; then
       echo has radio0 enabled
-      [ -f /tmp/iwdev.log ] && rm /tmp/iwdev.log
-      iw dev>/tmp/iwdev.log &
+      iw dev > /tmp/iwdev.log &
+      p_iw=$!
       sleep 20
-      [ $(cat /tmp/iwdev.log|wc -l) -eq 0 ] && now_reboot "iw dev freezes or radio0 misconfigured"
-      DEV="$(iw dev|grep Interface|grep -e 'mesh0' -e 'ibss0'| awk '{ print $2 }'|head -1)"
+      kill -0 $p_iw 2>/dev/null && now_reboot "iw dev freezes or radio0 misconfigured"
+      DEV="$(grep -h Interface /tmp/iwdev.log |grep -e 'mesh0' -e 'ibss0' | cut -f 2 -d ' '|head -1)"
       scan() {
         logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
         iw dev $DEV scan lowpri passive>/dev/null
       }
       OLD_NEIGHBOURS=$(cat /tmp/mesh_neighbours 2>/dev/null)
-      NEIGHBOURS=$(iw dev $DEV station dump | grep -e "^Station " | awk '{ print $2 }')
+      NEIGHBOURS=$(iw dev $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
       echo $NEIGHBOURS > /tmp/mesh_neighbours
       for NEIGHBOUR in $OLD_NEIGHBOURS; do
-        echo $NEIGHBOURS | grep $NEIGHBOUR >/dev/null || (scan; break)
+        echo $NEIGHBOURS | grep -q $NEIGHBOUR || (scan; break)
       done
     fi
   fi

@@ -49,8 +49,7 @@ dmesg | grep "ksoftirqd" | grep -q "page allcocation failure" && now_reboot "ker
 [ "$(ps |grep -c -e tunneldigger\ restart -e tunneldigger-watchdog)" -ge "9" ] && now_reboot "too many Tunneldigger-Restarts"
 
 # br-client without ipv6 in prefix-range
-brc6=$(ip -6 a s dev br-client | awk '/inet6/ { print $2 }'|cut -b1-9 |grep -c $(cat /lib/gluon/site.json|tr "," "\n"|grep \"prefix6\"|cut -d: -f2-3|cut -b2-10) 2>/dev/null)
-if [ "$brc6" == "0" ]; then
+if [ "$(ip -6 addr show to "$(jsonfilter -i /lib/gluon/site.json -e '$.prefix6')" dev br-client | grep -c inet6)" == "0" ]; then
   now_reboot "br-client without ipv6 in prefix-range (probably none)"
 fi
 

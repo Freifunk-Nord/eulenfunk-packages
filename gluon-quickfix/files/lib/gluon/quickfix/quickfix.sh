@@ -12,8 +12,7 @@ safety_exit() {
 now_reboot() {
   # first parameter message
   # second optional -f to force reboot even if autoupdater is running
-  MSG="rebooting... reason: $1"
-  logger -s -t "gluon-quickfix" -p 5 $MSG
+  logger -s -t "gluon-quickfix" -p 5 "rebooting... reason: $1"
   if [ "$(sed 's/\..*//g' /proc/uptime)" -gt "3600" ] ; then
     LOG=/lib/gluon/quickfix/reboot.log
     # the first 5 times log the reason for a reboot in a file that is rebootsave
@@ -62,14 +61,19 @@ reboot_when_not_running respondd
 reboot_when_not_running dropbear
 
 iw_dev_reboot_freeze() {
+  # first parameter defines the time to wait
+  # calls `iw` with the rest of the arguments given to the function
   local t=$1 ; shift
   iw dev $@ &
+  # get the bg process
   local p=$!
   sleep $t
-  kill -0 $p 2>/dev/null && now_reboot "iw dev freezes for more than $t s during 'iw dev $@'"
+  # kill -0 does nothing, but returns true if the process exists
+  kill -0 $p 2>/dev/null && now_reboot "'iw dev $@' freezes for more than $t s"
 }
 
 scan() {
+  # call iw $dev scan to repair defunc wifi
   logger -s -t "gluon-quickfix" -p 5 "neighbour lost, running iw scan"
   iw_dev_reboot_freeze 30 $1 scan lowpri passive>/dev/null
 }
@@ -79,11 +83,12 @@ for mesh_radio in `uci show wireless | grep -E -o '(ibss|mesh)_radio[0-9]+' | aw
   radio="$(uci get wireless.$mesh_radio.device)"
   if [[ "$(uci -q get wireless.$radio.disabled)" != "1" && "$(uci -q get wireless.$mesh_radio.disabled)" != "1" ]]; then
     DEV="$(uci get wireless.$mesh_radio.ifname)"
-    OLD_NEIGHBOURS=$(cat "/tmp/mesh_neighbours_$mesh_radio" 2>/dev/null)
-    NEIGHBOURS=$(iw_dev_reboot_freeze 20 $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ')
-    echo $NEIGHBOURS > "/tmp/mesh_neighbours_$mesh_radio"
+    N_LOG="/tmp/mesh_neighbours_$mesh_radio"
+    OLD_NEIGHBOURS=$(cat $N_LOG 2>/dev/null)
+    # fill log with new neighbours
+    iw_dev_reboot_freeze 20 $DEV station dump | grep -e "^Station " | cut -f 2 -d ' ' > $N_LOG
     for NEIGHBOUR in $OLD_NEIGHBOURS; do
-       grep -q $NEIGHBOUR "/tmp/mesh_neighbours_$mesh_radio" || (scan $DEV; break)
+       grep -q $NEIGHBOUR "$N_LOG" || (scan $DEV; break)
     done
   fi
 done

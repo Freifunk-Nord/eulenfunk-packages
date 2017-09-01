@@ -28,3 +28,14 @@ cd gluon-quickfix/
 scp -r files/* $LOGIN:/
 ssh $ROUTER_IP "/etc/init.d/micrond reload;"
 ```
+
+How is this implemented?
+========================
+
+There is only one bash file `/lib/gluon/quickfix/quickfix.sh` that is called by a cron job every
+5 Minutes in `/usr/lib/micron.d/quickfix`. So, if you want to change the rhythm or disable it
+just edit that micron.d-file.
+
+The reboot function logs the reasons for the first 5 reboots in the file `/lib/gluon/quickfix/reboot.log`
+so if that file exists, you should have a look there to find out, what problems occur here.
+
